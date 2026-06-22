@@ -20,7 +20,8 @@
 - Package manager is **npm**, not yarn — the official Bitfocus template defaults to yarn, but yarn isn't installed on this machine and the project has no need for yarn-specific features. This is a deliberate, low-risk deviation.
 - Test runner is Node's built-in `node:test` / `node:assert` — zero added dependencies, run via `npm test` → `node --test test/`.
 - Repo: `adp-Lab/companion-module-avaccess-4kmx44` (private), manifest `id`: `avaccess-4kmx44`, license MIT.
-- `InstanceBase`/`runEntrypoint` from `@companion-module/base` require a real Companion IPC parent process to run — `src/main.js` must never be `require()`'d directly in a test. Its syntax is checked with `node --check` instead; real behavior is confirmed by loading it into Companion's developer mode (final task, manual).
+- **Correction discovered during Task 4 (2026-06-23):** the official Bitfocus JS template (`bitfocus/companion-module-template-js`, fetched during planning) is stale relative to its own pinned dependency. It shows `runEntrypoint(ModuleInstance, UpgradeScripts)`, but `@companion-module/base`'s own CHANGELOG.md confirms `runEntrypoint` was removed in v2.0.0-alpha.0 ("remove runEntrypoint method, expect default export instead") and the installed v2.0.4 genuinely does not export it (verified directly: `Object.keys(require('@companion-module/base'))` lists `InstanceBase, InstanceStatus, Regex, TCPHelper, TelnetHelper, UDPHelper, combineRgb, createModuleLogger, ...` — no `runEntrypoint`). The correct v1 bootstrap (we have no prior version, so no upgrade scripts exist to pass anywhere) is simply `module.exports = ModuleInstance` at the bottom of `src/main.js` — see the corrected code in Task 9.
+- Because `module.exports = ModuleInstance` has no side effect at module-load time (it only defines a class), `src/main.js` **is** safe to `require()` in a test for static shape-checking (e.g. confirming it exports a class with an `init` method) — unlike the old `runEntrypoint(...)` call, which would have executed immediately on require. It is still never safe to **instantiate** (`new ModuleInstance(...)`) or call lifecycle methods on outside a real Companion IPC context — Task 9 only syntax-checks and shape-checks it; real runtime behavior is confirmed by loading it into Companion's developer mode (final task, manual).
 
 ---
 
@@ -486,10 +487,12 @@ Expected: exits 0, creates `node_modules/@companion-module/base` and `package-lo
 
 - [ ] **Step 3: Verify the dependency loads**
 
-Run: `node -e "const m = require('@companion-module/base'); console.log(typeof m.InstanceBase, typeof m.TCPHelper, typeof m.InstanceStatus, typeof m.runEntrypoint)"`
-Expected output: `function object function function`
+Run: `node -e "const m = require('@companion-module/base'); console.log(typeof m.InstanceBase, typeof m.TCPHelper, typeof m.InstanceStatus, typeof m.Regex)"`
+Expected output: `function function object object`
 
-If this fails or prints `undefined` for any of the four, stop and re-check the installed version against `@companion-module/base`'s published API before continuing to Task 5 — everything from here on depends on these four exports existing as expected.
+(Earlier versions of this plan checked for `m.runEntrypoint` here too — that was wrong. `@companion-module/base`'s own CHANGELOG.md confirms `runEntrypoint` was removed in v2.0.0-alpha.0 ("remove runEntrypoint method, expect default export instead"); v2.0.4 does not export it. Task 9's `main.js` uses `module.exports = ModuleInstance` instead, with no `runEntrypoint` call.)
+
+If this fails or prints `undefined` for any of the four, stop and re-check the installed version against `@companion-module/base`'s actual published exports (`node -e "console.log(Object.keys(require('@companion-module/base')))"`) before continuing — everything from here on depends on these four exports existing as expected.
 
 - [ ] **Step 4: Create `companion/manifest.json`**
 
@@ -1207,14 +1210,14 @@ git commit -m "feat: add 16 routing presets and 4 convenience presets"
 - Create: `src/main.js`
 
 **Interfaces:**
-- Consumes: `InstanceBase`, `Regex`, `runEntrypoint`, `InstanceStatus`, `TCPHelper` from `@companion-module/base`; `LineBuffer`, `parseDeviceReply`, `createInitialState`, `applyReplyToState` from `src/commands.js`; default exports of `src/actions.js`, `src/presets.js`, `src/feedbacks.js`
+- Consumes: `InstanceBase`, `Regex`, `InstanceStatus`, `TCPHelper` from `@companion-module/base`; `LineBuffer`, `parseDeviceReply`, `createInitialState`, `applyReplyToState` from `src/commands.js`; default exports of `src/actions.js`, `src/presets.js`, `src/feedbacks.js`
 
-This task has no new automated test of its own — Task 6 already confirmed the `TCPHelper` + parsing pipeline works, and Task 7 already confirmed the actions produce correct bytes over a real socket. `main.js` only assembles those already-proven pieces into the class shape Companion's `runEntrypoint` expects. Per Global Constraints, `runEntrypoint(ModuleInstance, [])` executes immediately when this file is required, and needs a real Companion IPC parent process to do so without throwing — so this file is never `require()`'d in a test, only syntax-checked.
+Most of this task has no new *behavioral* test of its own — Task 6 already confirmed the `TCPHelper` + parsing pipeline works, and Task 7 already confirmed the actions produce correct bytes over a real socket. `main.js` only assembles those already-proven pieces into the class Companion loads. Per Global Constraints, `module.exports = ModuleInstance` (not `runEntrypoint`, which was removed in `@companion-module/base` v2.0.0) has no side effect at require time, so this file can be safely `require()`'d for a static shape-check test — but never instantiated or have its lifecycle methods called outside a real Companion IPC context.
 
 - [ ] **Step 1: Create `src/main.js`**
 
 ```js
-const { InstanceBase, Regex, runEntrypoint, InstanceStatus, TCPHelper } = require('@companion-module/base')
+const { InstanceBase, Regex, InstanceStatus, TCPHelper } = require('@companion-module/base')
 const { LineBuffer, parseDeviceReply, createInitialState, applyReplyToState } = require('./commands')
 const UpdateActions = require('./actions')
 const UpdatePresets = require('./presets')
@@ -1306,23 +1309,47 @@ class ModuleInstance extends InstanceBase {
   }
 }
 
-runEntrypoint(ModuleInstance, [])
+module.exports = ModuleInstance
 ```
 
 - [ ] **Step 2: Syntax-check the file**
 
 Run: `node --check src/main.js`
-Expected: no output, exits 0 (this parses the file without executing `runEntrypoint`, so it's safe to run outside Companion)
+Expected: no output, exits 0
 
-- [ ] **Step 3: Run the full test suite**
+- [ ] **Step 3: Write and run a shape-check test**
+
+Create `test/main.test.js`:
+
+```js
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const { InstanceBase } = require('@companion-module/base')
+const ModuleInstance = require('../src/main')
+
+test('main.js exports a ModuleInstance class extending InstanceBase with the required lifecycle methods', () => {
+  assert.equal(typeof ModuleInstance, 'function')
+  assert.ok(ModuleInstance.prototype instanceof InstanceBase)
+  for (const method of ['init', 'destroy', 'configUpdated', 'getConfigFields', 'sendCommand']) {
+    assert.equal(typeof ModuleInstance.prototype[method], 'function', `missing method: ${method}`)
+  }
+})
+```
+
+This is safe to run — requiring `src/main.js` only defines the class (no `runEntrypoint`-style side effect runs at load time), and this test never calls `new ModuleInstance(...)` or invokes any lifecycle method, so it never touches a real IPC connection.
+
+Run: `node --test test/main.test.js`
+Expected: PASS — 1 test, 0 failures
+
+- [ ] **Step 4: Run the full test suite**
 
 Run: `npm test`
-Expected: PASS — all tests across `test/commands.test.js`, `test/manifest.test.js`, `test/actions.test.js`, `test/tcp-pipeline.integration.test.js`, `test/actions-tcp.integration.test.js`, `test/presets.test.js`
+Expected: PASS — all tests across `test/commands.test.js`, `test/manifest.test.js`, `test/actions.test.js`, `test/tcp-pipeline.integration.test.js`, `test/actions-tcp.integration.test.js`, `test/presets.test.js`, `test/main.test.js`
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/main.js
+git add src/main.js test/main.test.js
 git commit -m "feat: wire actions, presets, feedbacks, and TCP connection into ModuleInstance"
 ```
 
