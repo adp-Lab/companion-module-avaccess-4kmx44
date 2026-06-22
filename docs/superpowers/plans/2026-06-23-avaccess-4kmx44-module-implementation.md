@@ -18,7 +18,7 @@
 - EDID preset codes (1-12) are sent as **zero-padded two-digit strings** (`05`, not `5`) — confirmed from the manufacturer's documented request/response examples.
 - Default Telnet port is `23`.
 - Package manager is **npm**, not yarn — the official Bitfocus template defaults to yarn, but yarn isn't installed on this machine and the project has no need for yarn-specific features. This is a deliberate, low-risk deviation.
-- Test runner is Node's built-in `node:test` / `node:assert` — zero added dependencies, run via `npm test` → `node --test test/`.
+- Test runner is Node's built-in `node:test` / `node:assert` — zero added dependencies, run via `npm test` → `node --test` (no path argument — relies on Node's default recursive auto-discovery of `*.test.js` files from cwd). **Correction discovered during Task 4 (2026-06-23):** the originally-planned `node --test test/` (bare directory argument) fails on this machine's Node v25.6.1 with `MODULE_NOT_FOUND` — verified directly. Individual file invocations like `node --test test/commands.test.js` throughout this plan are unaffected; only the catch-all `npm test` script needed this fix.
 - Repo: `adp-Lab/companion-module-avaccess-4kmx44` (private), manifest `id`: `avaccess-4kmx44`, license MIT.
 - **Correction discovered during Task 4 (2026-06-23):** the official Bitfocus JS template (`bitfocus/companion-module-template-js`, fetched during planning) is stale relative to its own pinned dependency. It shows `runEntrypoint(ModuleInstance, UpgradeScripts)`, but `@companion-module/base`'s own CHANGELOG.md confirms `runEntrypoint` was removed in v2.0.0-alpha.0 ("remove runEntrypoint method, expect default export instead") and the installed v2.0.4 genuinely does not export it (verified directly: `Object.keys(require('@companion-module/base'))` lists `InstanceBase, InstanceStatus, Regex, TCPHelper, TelnetHelper, UDPHelper, combineRgb, createModuleLogger, ...` — no `runEntrypoint`). The correct v1 bootstrap (we have no prior version, so no upgrade scripts exist to pass anywhere) is simply `module.exports = ModuleInstance` at the bottom of `src/main.js` — see the corrected code in Task 9.
 - Because `module.exports = ModuleInstance` has no side effect at module-load time (it only defines a class), `src/main.js` **is** safe to `require()` in a test for static shape-checking (e.g. confirming it exports a class with an `init` method) — unlike the old `runEntrypoint(...)` call, which would have executed immediately on require. It is still never safe to **instantiate** (`new ModuleInstance(...)`) or call lifecycle methods on outside a real Companion IPC context — Task 9 only syntax-checks and shape-checks it; real runtime behavior is confirmed by loading it into Companion's developer mode (final task, manual).
@@ -464,7 +464,7 @@ git commit -m "feat: add matrix state model updated from parsed replies"
   "version": "0.1.0",
   "main": "src/main.js",
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test"
   },
   "license": "MIT",
   "repository": {
