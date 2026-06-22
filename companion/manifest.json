@@ -1,0 +1,21 @@
+{
+  "id": "avaccess-4kmx44",
+  "name": "AV Access 4KMX44-H2",
+  "shortname": "4kmx44-h2",
+  "description": "4x4 HDMI matrix with audio breakout, controlled over Telnet",
+  "version": "0.0.0",
+  "license": "MIT",
+  "repository": "git+https://github.com/adp-Lab/companion-module-avaccess-4kmx44.git",
+  "bugs": "https://github.com/adp-Lab/companion-module-avaccess-4kmx44/issues",
+  "maintainers": [{ "name": "Andre Doelle", "email": "mohn.edgar@gmail.com" }],
+  "runtime": {
+    "type": "node22",
+    "api": "nodejs-ipc",
+    "apiVersion": "0.0.0",
+    "entrypoint": "../src/main.js"
+  },
+  "legacyIds": [],
+  "manufacturer": "AV Access",
+  "products": ["4KMX44-H2"],
+  "keywords": ["matrix", "hdmi", "switcher"]
+}
