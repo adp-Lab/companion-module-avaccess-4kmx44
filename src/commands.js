@@ -73,6 +73,62 @@ function parseDeviceReply(line) {
   }
 }
 
+function createInitialState() {
+  return {
+    routing: { 1: null, 2: null, 3: null, 4: null },
+    audioMute: { 1: null, 2: null, 3: null, 4: null },
+    hdcp: { 1: null, 2: null, 3: null, 4: null },
+    scaler: { 1: null, 2: null, 3: null, 4: null },
+    cecPower: { 1: null, 2: null, 3: null, 4: null },
+  }
+}
+
+function applyBoolState(stateMap, target, value, prefix) {
+  if (target === 'all') {
+    for (const key of Object.keys(stateMap)) {
+      stateMap[key] = value === 'on'
+    }
+    return
+  }
+  if (target) {
+    const num = parseInt(target.replace(prefix, ''), 10)
+    if (!Number.isNaN(num)) {
+      stateMap[num] = value === 'on'
+    }
+  }
+}
+
+function applyReplyToState(state, reply) {
+  if (!reply) return
+
+  const { keyword, target, value } = reply
+
+  if (keyword === 'SW' || keyword === 'MP') {
+    if (!target) return
+    const inputNum = parseInt(target.replace('hdmiin', ''), 10)
+    if (Number.isNaN(inputNum)) return
+
+    if (value === 'all') {
+      for (const out of Object.keys(state.routing)) {
+        state.routing[out] = inputNum
+      }
+    } else if (value) {
+      const outputNum = parseInt(value.replace('hdmiout', ''), 10)
+      if (!Number.isNaN(outputNum)) {
+        state.routing[outputNum] = inputNum
+      }
+    }
+  } else if (keyword === 'MUTE') {
+    applyBoolState(state.audioMute, target, value, 'audioout')
+  } else if (keyword === 'HDCP_S') {
+    applyBoolState(state.hdcp, target, value, 'hdmiin')
+  } else if (keyword === 'SCALER') {
+    applyBoolState(state.scaler, target, value, 'hdmiout')
+  } else if (keyword === 'CEC_PWR') {
+    applyBoolState(state.cecPower, target, value, 'hdmiout')
+  }
+}
+
 module.exports = {
   buildSwitchCommand,
   buildRebootCommand,
@@ -85,4 +141,6 @@ module.exports = {
   buildEdidCommand,
   LineBuffer,
   parseDeviceReply,
+  createInitialState,
+  applyReplyToState,
 }

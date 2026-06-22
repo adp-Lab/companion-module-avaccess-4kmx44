@@ -12,6 +12,8 @@ const {
   buildEdidCommand,
   LineBuffer,
   parseDeviceReply,
+  createInitialState,
+  applyReplyToState,
 } = require('../src/commands')
 
 test('buildSwitchCommand builds the documented SET SW syntax', () => {
@@ -90,4 +92,61 @@ test('parseDeviceReply returns null for blank lines and unrecognized keywords', 
   assert.equal(parseDeviceReply(''), null)
   assert.equal(parseDeviceReply('   '), null)
   assert.equal(parseDeviceReply('GARBAGE 1 2'), null)
+})
+
+test('createInitialState starts every tracked value as null', () => {
+  const state = createInitialState()
+  assert.deepEqual(state.routing, { 1: null, 2: null, 3: null, 4: null })
+  assert.deepEqual(state.audioMute, { 1: null, 2: null, 3: null, 4: null })
+  assert.deepEqual(state.hdcp, { 1: null, 2: null, 3: null, 4: null })
+  assert.deepEqual(state.scaler, { 1: null, 2: null, 3: null, 4: null })
+  assert.deepEqual(state.cecPower, { 1: null, 2: null, 3: null, 4: null })
+})
+
+test('applyReplyToState records a single-output switch', () => {
+  const state = createInitialState()
+  applyReplyToState(state, parseDeviceReply('SW hdmiin1 hdmiout2'))
+  assert.equal(state.routing[2], 1)
+})
+
+test('applyReplyToState records a switch-to-all-outputs reply', () => {
+  const state = createInitialState()
+  applyReplyToState(state, parseDeviceReply('SW hdmiin3 all'))
+  assert.deepEqual(state.routing, { 1: 3, 2: 3, 3: 3, 4: 3 })
+})
+
+test('applyReplyToState records mute, HDCP, scaler, and CEC power for a single target', () => {
+  const state = createInitialState()
+  applyReplyToState(state, parseDeviceReply('MUTE audioout1 on'))
+  applyReplyToState(state, parseDeviceReply('HDCP_S hdmiin2 off'))
+  applyReplyToState(state, parseDeviceReply('SCALER hdmiout3 on'))
+  applyReplyToState(state, parseDeviceReply('CEC_PWR hdmiout4 off'))
+  assert.equal(state.audioMute[1], true)
+  assert.equal(state.hdcp[2], false)
+  assert.equal(state.scaler[3], true)
+  assert.equal(state.cecPower[4], false)
+})
+
+test('applyReplyToState records an "all" target for mute, scaler, and CEC power', () => {
+  const state = createInitialState()
+  applyReplyToState(state, parseDeviceReply('MUTE all on'))
+  assert.deepEqual(state.audioMute, { 1: true, 2: true, 3: true, 4: true })
+})
+
+test('applyReplyToState ignores a null reply without throwing', () => {
+  const state = createInitialState()
+  applyReplyToState(state, null)
+  assert.deepEqual(state.routing, { 1: null, 2: null, 3: null, 4: null })
+})
+
+test('the full pipeline applies a multi-line GET MP all reply', () => {
+  const state = createInitialState()
+  const lb = new LineBuffer()
+  const lines = lb.push(
+    'MP hdmiin1 hdmiout1\r\nMP hdmiin2 hdmiout2\r\nMP hdmiin3 hdmiout3\r\nMP hdmiin4 hdmiout4\r\n',
+  )
+  for (const line of lines) {
+    applyReplyToState(state, parseDeviceReply(line))
+  }
+  assert.deepEqual(state.routing, { 1: 1, 2: 2, 3: 3, 4: 4 })
 })
