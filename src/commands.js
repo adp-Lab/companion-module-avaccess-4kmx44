@@ -38,6 +38,41 @@ function buildEdidCommand(input, presetId) {
   return `SET EDID hdmiin${input} ${padded}\r\n`
 }
 
+class LineBuffer {
+  constructor() {
+    this.buffer = ''
+  }
+
+  push(chunk) {
+    this.buffer += chunk
+    const lines = []
+    let index
+    while ((index = this.buffer.indexOf('\r\n')) >= 0) {
+      lines.push(this.buffer.slice(0, index))
+      this.buffer = this.buffer.slice(index + 2)
+    }
+    return lines
+  }
+}
+
+const KNOWN_REPLY_KEYWORDS = ['SW', 'MP', 'MUTE', 'HDCP_S', 'SCALER', 'CEC_PWR', 'PRESET', 'EDID', 'REBOOT', 'RESET']
+
+function parseDeviceReply(line) {
+  const trimmed = line.trim()
+  if (trimmed === '') return null
+
+  const parts = trimmed.split(/\s+/)
+  const keyword = parts[0]
+
+  if (!KNOWN_REPLY_KEYWORDS.includes(keyword)) return null
+
+  return {
+    keyword,
+    target: parts[1] ?? null,
+    value: parts[2] ?? null,
+  }
+}
+
 module.exports = {
   buildSwitchCommand,
   buildRebootCommand,
@@ -48,4 +83,6 @@ module.exports = {
   buildScalerCommand,
   buildCecPowerCommand,
   buildEdidCommand,
+  LineBuffer,
+  parseDeviceReply,
 }
