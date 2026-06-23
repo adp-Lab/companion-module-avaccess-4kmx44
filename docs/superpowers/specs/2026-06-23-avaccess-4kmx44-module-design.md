@@ -112,6 +112,8 @@ All option values (input/output numbers, on/off, scene slot, EDID preset id) are
 - **Integration test** (`test/fake-matrix.integration.test.js`): a local Node `net` TCP server stands in for the matrix on a free port. Companion's HTTP API triggers every preset and every action; the test asserts the fake server received the exact expected bytes for all 9 action families, and that canned fake replies update the internal state model correctly — so the feedback foundation is verified now, against a fake device, before the real one exists.
 - No hardware-in-the-loop tests yet. Verifying against the real matrix is an explicit go-live checklist item once it arrives, not part of this spec.
 
+> **Post-build reconciliation (2026-06-24):** the single `fake-matrix.integration.test.js` sketched above was implemented as a cleaner split — `test/tcp-pipeline.integration.test.js` (TCPHelper receive → parse → state) and `test/actions-tcp.integration.test.js` (all 9 actions send exact bytes over a real socket) — plus `actions.test.js`, `presets.test.js`, `main.test.js`, and `manifest.test.js`. 36 tests total, all green. Also added after the final review: the required top-level manifest `"type": "connection"` (v2 SDK schema requirement). Spec validation note (line ~86) "all option values validated against documented ranges" is satisfied by the Companion dropdown choices, not by range-checks inside the pure builders.
+
 ## Open questions / anticipated-not-confirmed
 
 These are flagged honestly rather than guessed at, consistent with how the rest of this project has been verified:
