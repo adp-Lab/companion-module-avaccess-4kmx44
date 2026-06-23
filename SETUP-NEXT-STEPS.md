@@ -1,7 +1,22 @@
 # AV Access 4KMX44 Companion Module — Setup & Next Steps
 
-> Personal handoff doc. Everything needed to go live once the physical matrix arrives.
-> Module is **built, tested (36/36), reviewed, and merged to `main`** — nothing left to code for v1.
+> Personal handoff doc. Module is **built, tested (37/37), reviewed, merged to `main`, and CONFIRMED WORKING on real hardware (2026-06-23).**
+
+---
+
+## ⚡ Findings & gotchas (read FIRST if anything breaks)
+
+Hard-won during the 2026-06-23 hardware bring-up — don't re-hit these:
+
+1. **Dev module MUST be a real copy, never a symlink.** Companion 4.3 sandboxes each dev module with Node's permission model (`--allow-fs-read` only inside the module folder). A symlink to the repo escapes it → `Access to this API has been restricted. Use --allow-fs-read`, endless "Restart forced", **and the connection shows NO config fields / "Connection is not running"** (the IP field is missing *because* the module never starts). Fix = rsync a real copy (see Step 2). On Windows: `git clone` + `npm install` into the dev folder (real files, same effect).
+2. **No config fields showing ≠ a missing-field bug.** It means the module crashed on startup. Always read the log: `~/Library/Application Support/companion/logs/companion-<date>.0.log` → grep for the connection label. The *real* error is there, not in the UI.
+3. **CommonJS entrypoint is fine.** `module.exports = ModuleInstance` (no `runEntrypoint`) loads correctly in Companion 4.3 — no ESM conversion needed. (`runEntrypoint` was removed from the SDK in v2.0; the official JS template is stale and still shows it.)
+4. **Manifest needs top-level `"type": "connection"`** — required by the v2 SDK schema; without it the module won't load. (Already in our manifest.)
+5. **`node --test test/` (bare dir) fails on Node 25** — use `node --test` (no path). (Already fixed in package.json.)
+6. **Device discovery:** no fixed default IP — DHCP. First unit = `192.0.2.53` on the FritzBox (MAC `AA:BB:CC:DD:EE:FF`, OEM "Grandbeing"), ports 23+80 open. **Did not appear in the FritzBox device list** (advertises no hostname) — found via a LAN scan app. Web UI = LAN-only, `admin`/`admin`; **no RS232 needed**.
+7. **Scene slots = 3** (Web UI shows Save/Load 1–3), not 8. Dropdowns fixed to 1–3.
+8. **Web UI doesn't live-poll** — it only reflects front-panel/API changes after a page reload. (Same reason v1 has no live button feedback yet.)
+9. **After any repo code change**, re-run the Step 2 rsync to refresh the dev copy, then refresh Presets / toggle the connection.
 
 ---
 
@@ -96,6 +111,8 @@ Surfaced by the **`companion-module-review`** skill repo (a friend's link), chec
 - To run the review system against this module, or read the v2 rules: work from `/Users/drean/Ponyhof/companion-module-review` (see its README; needs PowerShell 7.6+).
 
 ## Step 5 (later) — v1.1: live feedback
+
+> **Requirement (André):** active/live buttons must go **RED** (`bgcolor: 0xff0000`), NOT green. Companion modules default to green — override it in the feedback's default style.
 
 Deliberately **not** in v1. The groundwork is done and tested: `main.js` already feeds every received line through `LineBuffer → parseDeviceReply → applyReplyToState`, maintaining `this.state` (routing / audioMute / hdcp / scaler / cecPower). Adding feedback is a **pure addition**, no restructuring:
 1. Add a poll timer (or rely on push) issuing `GET MP all`, `GET MUTE`, etc.
