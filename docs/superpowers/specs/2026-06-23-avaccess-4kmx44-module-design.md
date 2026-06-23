@@ -118,7 +118,8 @@ All option values (input/output numbers, on/off, scene slot, EDID preset id) are
 
 These are flagged honestly rather than guessed at, consistent with how the rest of this project has been verified:
 
-- **Maximum hardware scene slot count** — the API doc shows `{1,2,3...}` with no stated ceiling. Defaulting the UI dropdown to 1-8; confirm the real limit once the Web UI's own preset list is visible.
+- ✅ **RESOLVED (2026-06-23) Maximum hardware scene slot count = 3.** The Web UI Preset section shows only Save/Load 1–3. `SCENE_CHOICES` changed from 1–8 to 1–3 in `src/actions.js`. (Original note: API doc showed `{1,2,3...}` with no stated ceiling, defaulted to 1-8 pending hardware.)
+- ✅ **RESOLVED (2026-06-23) Device reachable over LAN only.** First unit got DHCP `192.0.2.53` (MAC `AA:BB:CC:DD:EE:FF`, OEM Grandbeing); ports 23 (telnet) + 80 (web) open. Did not show in the FritzBox device list (no hostname advertised) — found via LAN scan. No RS232 needed; web UI = LAN-only. On-site: re-pin via DHCP reservation or device static on that router.
 - **Whether toggling HDCP forces a genuine re-handshake** — inference from how HDCP/EDID negotiation generally works, not a mechanism AV Access documents explicitly.
 - **Whether EDID changes take effect live or need a hotplug/replug** — not stated; sources often cache EDID read at connect time.
 - **Real switching latency / whether it's ever "seamless"** — the manual makes no seamless-switching claim anywhere, and this is a budget-tier device, so a brief HDCP/sync blip per switch is the expectation, not a confirmed measurement.

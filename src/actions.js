@@ -20,7 +20,8 @@ const ON_OFF_CHOICES = [
   { id: 'on', label: 'On' },
   { id: 'off', label: 'Off' },
 ]
-const SCENE_CHOICES = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ id: n, label: `Scene ${n}` }))
+// The 4KMX44-H2 has 3 hardware scene slots (Web UI shows Save/Load 1-3), confirmed on real hardware 2026-06-23.
+const SCENE_CHOICES = [1, 2, 3].map((n) => ({ id: n, label: `Scene ${n}` }))
 const EDID_CHOICES = [
   { id: 1, label: 'Copy from Output 1' },
   { id: 2, label: 'Copy from Output 2' },
