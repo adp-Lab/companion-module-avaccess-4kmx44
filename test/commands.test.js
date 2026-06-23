@@ -14,6 +14,8 @@ const {
   parseDeviceReply,
   createInitialState,
   applyReplyToState,
+  buildPollCommands,
+  routingEquals,
 } = require('../src/commands')
 
 test('buildSwitchCommand builds the documented SET SW syntax', () => {
@@ -103,6 +105,16 @@ test('createInitialState starts every tracked value as null', () => {
   assert.deepEqual(state.cecPower, { 1: null, 2: null, 3: null, 4: null })
 })
 
+test('createInitialState includes empty scene snapshots', () => {
+  assert.deepEqual(createInitialState().scenes, { 1: null, 2: null, 3: null })
+})
+
+test('routingEquals compares all four outputs and rejects null snapshots', () => {
+  assert.equal(routingEquals({ 1: 1, 2: 2, 3: 3, 4: 4 }, { 1: 1, 2: 2, 3: 3, 4: 4 }), true)
+  assert.equal(routingEquals({ 1: 1, 2: 2, 3: 3, 4: 4 }, { 1: 1, 2: 2, 3: 3, 4: 1 }), false)
+  assert.equal(routingEquals(null, { 1: 1, 2: 2, 3: 3, 4: 4 }), false)
+})
+
 test('applyReplyToState records a single-output switch', () => {
   const state = createInitialState()
   applyReplyToState(state, parseDeviceReply('SW hdmiin1 hdmiout2'))
@@ -137,6 +149,41 @@ test('applyReplyToState ignores a null reply without throwing', () => {
   const state = createInitialState()
   applyReplyToState(state, null)
   assert.deepEqual(state.routing, { 1: null, 2: null, 3: null, 4: null })
+})
+
+test('buildPollCommands returns the read-only status queries with CRLF terminators', () => {
+  // GET MP all is the clean poll path: confirmed on hardware to use hdmiin-prefixed,
+  // CRLF-separated lines (per-output GET MP returns the short "inN" form instead).
+  assert.deepEqual(buildPollCommands(), [
+    'GET MP all\r\n',
+    'GET MUTE all\r\n',
+    'GET HDCP_S all\r\n',
+    'GET SCALER all\r\n',
+  ])
+})
+
+test('applyReplyToState ignores routing replies for out-of-range outputs', () => {
+  const state = createInitialState()
+  applyReplyToState(state, parseDeviceReply('MP hdmiin1 hdmiout9'))
+  assert.deepEqual(state.routing, { 1: null, 2: null, 3: null, 4: null })
+})
+
+test('applyReplyToState ignores routing replies for out-of-range inputs', () => {
+  const state = createInitialState()
+  applyReplyToState(state, parseDeviceReply('MP hdmiin9 hdmiout1'))
+  assert.deepEqual(state.routing, { 1: null, 2: null, 3: null, 4: null })
+})
+
+test('applyReplyToState tolerates the short "inN" form returned by per-output GET MP', () => {
+  const state = createInitialState()
+  applyReplyToState(state, parseDeviceReply('MP in2 hdmiout1'))
+  assert.equal(state.routing[1], 2)
+})
+
+test('applyReplyToState ignores bool replies for out-of-range targets', () => {
+  const state = createInitialState()
+  applyReplyToState(state, parseDeviceReply('MUTE audioout9 on'))
+  assert.deepEqual(state.audioMute, { 1: null, 2: null, 3: null, 4: null })
 })
 
 test('the full pipeline applies a multi-line GET MP all reply', () => {

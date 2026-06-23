@@ -1,8 +1,15 @@
 const { InstanceBase, Regex, InstanceStatus, TCPHelper } = require('@companion-module/base')
-const { LineBuffer, parseDeviceReply, createInitialState, applyReplyToState } = require('./commands')
+const { LineBuffer, parseDeviceReply, createInitialState, applyReplyToState, buildPollCommands } = require('./commands')
 const UpdateActions = require('./actions')
 const UpdatePresets = require('./presets')
 const UpdateFeedbacks = require('./feedbacks')
+const { FEEDBACK_IDS } = require('./feedbacks')
+
+// The matrix doesn't push unsolicited updates, so we poll. It also drops GET queries
+// that arrive back-to-back (confirmed on hardware: a tight burst of 4 only answered the
+// first 2), so we send ONE command per tick, round-robin. With 4 poll commands a full
+// state refresh takes ~4 ticks (~1.2 s) — fast enough for routing feedback.
+const POLL_STAGGER_MS = 300
 
 class ModuleInstance extends InstanceBase {
   async init(config) {
@@ -17,6 +24,7 @@ class ModuleInstance extends InstanceBase {
   }
 
   async destroy() {
+    this.stopPolling()
     if (this.socket) {
       this.socket.destroy()
       delete this.socket
@@ -36,6 +44,7 @@ class ModuleInstance extends InstanceBase {
   }
 
   initTcp() {
+    this.stopPolling()
     if (this.socket) {
       this.socket.destroy()
       delete this.socket
@@ -60,13 +69,55 @@ class ModuleInstance extends InstanceBase {
       this.log('error', `Network error: ${err.message}`)
     })
 
+    // Poll once connected; restart cleanly on auto-reconnect, stop when the link drops.
+    this.socket.on('connect', () => this.startPolling())
+    this.socket.on('end', () => this.stopPolling())
+
     this.socket.on('data', (chunk) => {
       const lines = this.lineBuffer.push(chunk.toString('latin1'))
+      let changed = false
+      let routingChanged = false
       for (const line of lines) {
         const reply = parseDeviceReply(line)
-        applyReplyToState(this.state, reply)
+        if (reply) {
+          applyReplyToState(this.state, reply)
+          changed = true
+          if (reply.keyword === 'SW' || reply.keyword === 'MP') routingChanged = true
+        }
+      }
+      this.maybeLearnScene(routingChanged)
+      if (changed) {
+        this.checkFeedbacks(...FEEDBACK_IDS)
       }
     })
+  }
+
+  // After a recall, the first poll that actually refreshes routing teaches us the
+  // recalled slot's contents (the device can't report them directly).
+  maybeLearnScene(routingChanged) {
+    if (routingChanged && this.pendingSceneLearn != null) {
+      this.state.scenes[this.pendingSceneLearn] = { ...this.state.routing }
+      this.pendingSceneLearn = null
+    }
+  }
+
+  startPolling() {
+    this.stopPolling()
+    const commands = buildPollCommands()
+    let i = 0
+    const tick = () => {
+      this.sendCommand(commands[i % commands.length])
+      i++
+    }
+    tick() // prime the first command immediately, then one per tick
+    this.pollTimer = setInterval(tick, POLL_STAGGER_MS)
+  }
+
+  stopPolling() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer)
+      delete this.pollTimer
+    }
   }
 
   sendCommand(command) {

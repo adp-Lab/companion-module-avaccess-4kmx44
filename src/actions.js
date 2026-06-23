@@ -61,6 +61,8 @@ module.exports = function (self) {
       options: [{ type: 'dropdown', id: 'slot', label: 'Scene Slot', default: 1, choices: SCENE_CHOICES }],
       callback: async (action) => {
         self.sendCommand(buildSaveSceneCommand(action.options.slot))
+        // Saving stores the CURRENT routing into this slot — learn it immediately (copy).
+        if (self.state) self.state.scenes[action.options.slot] = { ...self.state.routing }
       },
     },
     recall_scene: {
@@ -68,6 +70,8 @@ module.exports = function (self) {
       options: [{ type: 'dropdown', id: 'slot', label: 'Scene Slot', default: 1, choices: SCENE_CHOICES }],
       callback: async (action) => {
         self.sendCommand(buildRecallSceneCommand(action.options.slot))
+        // After the recall settles, the next routing poll teaches us this slot's contents.
+        self.pendingSceneLearn = action.options.slot
       },
     },
     set_audio_mute: {
@@ -108,6 +112,38 @@ module.exports = function (self) {
       ],
       callback: async (action) => {
         self.sendCommand(buildCecPowerCommand(action.options.output, action.options.state))
+      },
+    },
+    toggle_audio_mute: {
+      name: 'Toggle Audio Mute',
+      options: [{ type: 'dropdown', id: 'output', label: 'Output', default: 1, choices: OUTPUT_CHOICES }],
+      callback: async (action) => {
+        const muted = self.state.audioMute[action.options.output] === true
+        self.sendCommand(buildMuteCommand(action.options.output, muted ? 'off' : 'on'))
+      },
+    },
+    toggle_mute_all: {
+      name: 'Toggle Audio Mute (All Outputs)',
+      options: [],
+      callback: async () => {
+        const allMuted = [1, 2, 3, 4].every((o) => self.state.audioMute[o] === true)
+        self.sendCommand(buildMuteCommand('all', allMuted ? 'off' : 'on'))
+      },
+    },
+    toggle_hdcp: {
+      name: 'Toggle HDCP Support',
+      options: [{ type: 'dropdown', id: 'input', label: 'Input', default: 1, choices: INPUT_CHOICES }],
+      callback: async (action) => {
+        const on = self.state.hdcp[action.options.input] === true
+        self.sendCommand(buildHdcpCommand(action.options.input, on ? 'off' : 'on'))
+      },
+    },
+    toggle_scaler: {
+      name: 'Toggle Output Downscaler',
+      options: [{ type: 'dropdown', id: 'output', label: 'Output', default: 1, choices: OUTPUT_CHOICES }],
+      callback: async (action) => {
+        const on = self.state.scaler[action.options.output] === true
+        self.sendCommand(buildScalerCommand(action.options.output, on ? 'off' : 'on'))
       },
     },
     set_edid: {
