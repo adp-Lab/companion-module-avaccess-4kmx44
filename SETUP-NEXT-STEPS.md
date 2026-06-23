@@ -78,6 +78,19 @@ These were impossible to verify without the device. Check each once, note the an
 
 ---
 
+## Verify-on-first-load (two findings from the v2 compliance skill)
+
+Surfaced by the **`companion-module-review`** skill repo (a friend's link), checked against the installed SDK:
+
+1. **FIXED — manifest `"type": "connection"`.** The `@companion-module/base` v2 manifest schema *requires* a top-level `"type": "connection"`; ours was missing it, which would have blocked loading in Companion 4.3+. Added + asserted in `manifest.test.js`. (commit `44781b5`)
+2. **VERIFY on first sideload — entrypoint export form.** We use CommonJS `module.exports = ModuleInstance` (the CJS equivalent of the default export the v2 SDK expects). Almost certainly fine, but the official JS template is stale here (still shows the removed `runEntrypoint`), so there's no clean reference. **If Companion errors on the entrypoint when you load it, that's the spot** — the fix would be converting `src/main.js` to ESM `export default class ModuleInstance` + `export const UpgradeScripts = []` (and `"type":"module"` in package.json).
+
+### Companion-dev skills installed (reusable for companion-vmix too)
+- Friend's repo cloned to `/Users/drean/Ponyhof/companion-module-review` (22 skills + a report-only review system; repo has no license — kept as a local tool, not re-committed anywhere).
+- Symlinked into this project at `.claude/skills` (gitignored) — so the `companion-v2-api-compliance`, `companion-actions/feedbacks/presets`, `template-compliance`, `review-scorecard` etc. skills are active when working here.
+- To enable them in another Companion project: `ln -s ../../companion-module-review/.claude/skills <project>/.claude/skills`
+- To run the review system against this module, or read the v2 rules: work from `/Users/drean/Ponyhof/companion-module-review` (see its README; needs PowerShell 7.6+).
+
 ## Step 5 (later) — v1.1: live feedback
 
 Deliberately **not** in v1. The groundwork is done and tested: `main.js` already feeds every received line through `LineBuffer → parseDeviceReply → applyReplyToState`, maintaining `this.state` (routing / audioMute / hdcp / scaler / cecPower). Adding feedback is a **pure addition**, no restructuring:
