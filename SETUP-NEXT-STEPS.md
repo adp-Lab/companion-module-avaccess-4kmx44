@@ -36,14 +36,18 @@
 
 Companion can't see the module until you enable Developer Modules and point it at a folder **containing** the module as a subfolder.
 
-**Clean setup (recommended) — a dedicated dev-modules folder via symlink:**
+> ⚠️ **CRITICAL — must be a REAL copy, NOT a symlink.** Companion 4.3 runs each dev module in a Node permission **sandbox** that only allows filesystem reads *inside the module's own folder*. A symlink that points out to the git repo escapes the sandbox → the module fails with `Access to this API has been restricted. Use --allow-fs-read` and loops on "Connection is not running" with **no config fields shown**. So copy real files in:
+
 ```bash
-mkdir -p ~/companion-dev-modules
-ln -s /Users/drean/Ponyhof/companion-module-avaccess-4kmx44 \
-      ~/companion-dev-modules/companion-module-avaccess-4kmx44
-# make sure deps are present (already installed, but safe to re-run):
-cd /Users/drean/Ponyhof/companion-module-avaccess-4kmx44 && npm install
+mkdir -p ~/companion-dev-modules/companion-module-avaccess-4kmx44
+# REAL copy (incl. node_modules), excluding git/worktree/scratch — no escaping symlinks:
+rsync -a --delete \
+  --exclude='.git' --exclude='.claude' --exclude='.superpowers' \
+  --exclude='docs' --exclude='test' --exclude='*.log' \
+  /Users/drean/Ponyhof/companion-module-avaccess-4kmx44/ \
+  ~/companion-dev-modules/companion-module-avaccess-4kmx44/
 ```
+**After any code change in the repo, re-run that rsync** to refresh the dev copy, then restart the connection (or the Companion GUI). The repo stays the canonical/git-tracked source; the dev folder is a disposable real copy.
 Then in Companion:
 1. Launcher window → **settings cog** → **Developer** section.
 2. **Developer Modules Path** → select `~/companion-dev-modules`.
