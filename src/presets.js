@@ -1,3 +1,6 @@
+// Button text uses a literal "\n" for the line break (e.g. IN1→\nOUT2), matching
+// how Companion's button text field renders it — confirmed on hardware 2026-06-23.
+
 function generateRoutingPresets() {
   const presets = {}
   for (let input = 1; input <= 4; input++) {
@@ -6,8 +9,8 @@ function generateRoutingPresets() {
         type: 'simple',
         name: `IN${input}→OUT${output}`,
         style: {
-          text: `IN${input}→OUT${output}`,
-          size: '18',
+          text: `IN${input}→\\nOUT${output}`,
+          size: '24',
           color: 0xffffff,
           bgcolor: 0x000000,
         },
@@ -19,6 +22,27 @@ function generateRoutingPresets() {
         ],
         feedbacks: [],
       }
+    }
+  }
+  return presets
+}
+
+function generateScenePresets() {
+  const presets = {}
+  for (let slot = 1; slot <= 3; slot++) {
+    presets[`save_scene_${slot}`] = {
+      type: 'simple',
+      name: `Save Scene ${slot}`,
+      style: { text: `SAVE\\n${slot}`, size: '24', color: 0xffffff, bgcolor: 0x0000aa },
+      steps: [{ down: [{ actionId: 'save_scene', options: { slot } }], up: [] }],
+      feedbacks: [],
+    }
+    presets[`recall_scene_${slot}`] = {
+      type: 'simple',
+      name: `Recall Scene ${slot}`,
+      style: { text: `LOAD\\n${slot}`, size: '24', color: 0xffffff, bgcolor: 0x000000 },
+      steps: [{ down: [{ actionId: 'recall_scene', options: { slot } }], up: [] }],
+      feedbacks: [],
     }
   }
   return presets
@@ -36,22 +60,15 @@ function generateConveniencePresets() {
     mute_all: {
       type: 'simple',
       name: 'Mute All',
-      style: { text: 'MUTE ALL', size: '14', color: 0xffffff, bgcolor: 0x000000 },
+      style: { text: 'MUTE\\nALL', size: '18', color: 0xffffff, bgcolor: 0x000000 },
       steps: [{ down: [{ actionId: 'set_audio_mute', options: { output: 'all', state: 'on' } }], up: [] }],
       feedbacks: [],
     },
     unmute_all: {
       type: 'simple',
       name: 'Unmute All',
-      style: { text: 'UNMUTE ALL', size: '14', color: 0xffffff, bgcolor: 0x000000 },
+      style: { text: 'UNMUTE\\nALL', size: '18', color: 0xffffff, bgcolor: 0x000000 },
       steps: [{ down: [{ actionId: 'set_audio_mute', options: { output: 'all', state: 'off' } }], up: [] }],
-      feedbacks: [],
-    },
-    recall_scene_1: {
-      type: 'simple',
-      name: 'Recall Scene 1',
-      style: { text: 'SCENE 1', size: '14', color: 0xffffff, bgcolor: 0x000000 },
-      steps: [{ down: [{ actionId: 'recall_scene', options: { slot: 1 } }], up: [] }],
       feedbacks: [],
     },
   }
@@ -59,11 +76,13 @@ function generateConveniencePresets() {
 
 module.exports = function (self) {
   const routingPresets = generateRoutingPresets()
+  const scenePresets = generateScenePresets()
   const conveniencePresets = generateConveniencePresets()
-  const presets = { ...routingPresets, ...conveniencePresets }
+  const presets = { ...routingPresets, ...scenePresets, ...conveniencePresets }
 
   const structure = [
     { id: 'routing', name: 'Routing', definitions: Object.keys(routingPresets) },
+    { id: 'scenes', name: 'Scenes', definitions: Object.keys(scenePresets) },
     { id: 'convenience', name: 'Convenience', definitions: Object.keys(conveniencePresets) },
   ]
 
@@ -71,4 +90,5 @@ module.exports = function (self) {
 }
 
 module.exports.generateRoutingPresets = generateRoutingPresets
+module.exports.generateScenePresets = generateScenePresets
 module.exports.generateConveniencePresets = generateConveniencePresets
