@@ -1,6 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const UpdateActions = require('../src/actions')
+const { EDID_CHOICES } = UpdateActions
 
 function makeFakeSelf(state) {
   const sent = []
@@ -124,4 +125,10 @@ test('all 13 actions are registered', () => {
       'switch_input_to_output', 'toggle_audio_mute', 'toggle_mute_all', 'toggle_hdcp', 'toggle_scaler',
     ].sort(),
   )
+})
+
+test('EDID_CHOICES is exported for reuse by variables.js and matches the 12 device presets', () => {
+  assert.equal(EDID_CHOICES.length, 12)
+  assert.deepEqual(EDID_CHOICES[0], { id: 1, label: 'Copy from Output 1' })
+  assert.deepEqual(EDID_CHOICES[11], { id: 12, label: 'Smart EDID' })
 })

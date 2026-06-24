@@ -158,3 +158,5 @@ module.exports = function (self) {
     },
   })
 }
+
+module.exports.EDID_CHOICES = EDID_CHOICES
