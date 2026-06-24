@@ -9,15 +9,17 @@ function stateWith(overrides) {
 }
 
 test('buildVariableDefinitions declares every Tier 1/2/3 variable id exactly once', () => {
-  const ids = buildVariableDefinitions().map((d) => d.variableId)
-  assert.equal(new Set(ids).size, ids.length, 'no duplicate variable ids')
+  const definitions = buildVariableDefinitions()
+  assert.equal(Object.keys(definitions).length, 30, 'declares exactly 30 variable ids')
   for (const io of [1, 2, 3, 4]) {
     for (const id of [`out${io}_source`, `in${io}_outputs`, `out${io}_mute`, `in${io}_hdcp`, `out${io}_scaler`, `in${io}_edid`]) {
-      assert.ok(ids.includes(id), `missing ${id}`)
+      assert.ok(id in definitions, `missing ${id}`)
+      assert.equal(typeof definitions[id].name, 'string', `${id} should have a string name`)
     }
   }
   for (const id of ['routing_summary', 'active_scene', 'model', 'firmware', 'ip_address', 'ip_mode']) {
-    assert.ok(ids.includes(id), `missing ${id}`)
+    assert.ok(id in definitions, `missing ${id}`)
+    assert.equal(typeof definitions[id].name, 'string', `${id} should have a string name`)
   }
 })
 

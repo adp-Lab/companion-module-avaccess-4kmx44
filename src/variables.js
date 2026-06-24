@@ -63,21 +63,21 @@ function buildVariableValues(state) {
 }
 
 function buildVariableDefinitions() {
-  const definitions = []
+  const definitions = {}
   for (const io of IO_NUMBERS) {
-    definitions.push({ variableId: `out${io}_source`, name: `Output ${io}: source input` })
-    definitions.push({ variableId: `in${io}_outputs`, name: `Input ${io}: fed outputs` })
-    definitions.push({ variableId: `out${io}_mute`, name: `Output ${io}: mute state` })
-    definitions.push({ variableId: `in${io}_hdcp`, name: `Input ${io}: HDCP state` })
-    definitions.push({ variableId: `out${io}_scaler`, name: `Output ${io}: scaler state` })
-    definitions.push({ variableId: `in${io}_edid`, name: `Input ${io}: EDID preset` })
+    definitions[`out${io}_source`] = { name: `Output ${io}: source input` }
+    definitions[`in${io}_outputs`] = { name: `Input ${io}: fed outputs` }
+    definitions[`out${io}_mute`] = { name: `Output ${io}: mute state` }
+    definitions[`in${io}_hdcp`] = { name: `Input ${io}: HDCP state` }
+    definitions[`out${io}_scaler`] = { name: `Output ${io}: scaler state` }
+    definitions[`in${io}_edid`] = { name: `Input ${io}: EDID preset` }
   }
-  definitions.push({ variableId: 'routing_summary', name: 'Routing summary (all outputs)' })
-  definitions.push({ variableId: 'active_scene', name: 'Active scene slot' })
-  definitions.push({ variableId: 'model', name: 'Device model' })
-  definitions.push({ variableId: 'firmware', name: 'Firmware version' })
-  definitions.push({ variableId: 'ip_address', name: 'IP address' })
-  definitions.push({ variableId: 'ip_mode', name: 'IP mode (DHCP/Static)' })
+  definitions.routing_summary = { name: 'Routing summary (all outputs)' }
+  definitions.active_scene = { name: 'Active scene slot' }
+  definitions.model = { name: 'Device model' }
+  definitions.firmware = { name: 'Firmware version' }
+  definitions.ip_address = { name: 'IP address' }
+  definitions.ip_mode = { name: 'IP mode (DHCP/Static)' }
   return definitions
 }
 
