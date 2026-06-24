@@ -1,9 +1,19 @@
 const { InstanceBase, Regex, InstanceStatus, TCPHelper } = require('@companion-module/base')
-const { LineBuffer, parseDeviceReply, createInitialState, applyReplyToState, buildPollCommands } = require('./commands')
+const {
+  LineBuffer,
+  parseDeviceReply,
+  parseVersionReply,
+  createInitialState,
+  applyReplyToState,
+  buildPollCommands,
+  buildStaticInfoCommands,
+} = require('./commands')
 const UpdateActions = require('./actions')
 const UpdatePresets = require('./presets')
 const UpdateFeedbacks = require('./feedbacks')
 const { FEEDBACK_IDS } = require('./feedbacks')
+const UpdateVariables = require('./variables')
+const { buildVariableValues } = require('./variables')
 
 // The matrix doesn't push unsolicited updates, so we poll. It also drops GET queries
 // that arrive back-to-back (confirmed on hardware: a tight burst of 4 only answered the
@@ -19,6 +29,7 @@ class ModuleInstance extends InstanceBase {
     this.updateActions()
     this.updateFeedbacks()
     this.updatePresets()
+    this.updateVariables()
 
     this.initTcp()
   }
@@ -83,11 +94,20 @@ class ModuleInstance extends InstanceBase {
           applyReplyToState(this.state, reply)
           changed = true
           if (reply.keyword === 'SW' || reply.keyword === 'MP') routingChanged = true
+        } else {
+          // GET VER's reply is a free-form sentence ("4KMX44-H2 VER 3.1, ARM VER 2.6"),
+          // not the generic KEYWORD/target/value shape parseDeviceReply expects.
+          const version = parseVersionReply(line)
+          if (version) {
+            Object.assign(this.state.deviceInfo, version)
+            changed = true
+          }
         }
       }
       this.maybeLearnScene(routingChanged)
       if (changed) {
         this.checkFeedbacks(...FEEDBACK_IDS)
+        this.setVariableValues(buildVariableValues(this.state))
       }
     })
   }
@@ -103,10 +123,15 @@ class ModuleInstance extends InstanceBase {
 
   startPolling() {
     this.stopPolling()
-    const commands = buildPollCommands()
+    const staticCommands = buildStaticInfoCommands()
+    const pollCommands = buildPollCommands()
     let i = 0
     const tick = () => {
-      this.sendCommand(commands[i % commands.length])
+      if (i < staticCommands.length) {
+        this.sendCommand(staticCommands[i])
+      } else {
+        this.sendCommand(pollCommands[(i - staticCommands.length) % pollCommands.length])
+      }
       i++
     }
     tick() // prime the first command immediately, then one per tick
@@ -138,6 +163,10 @@ class ModuleInstance extends InstanceBase {
 
   updatePresets() {
     UpdatePresets(this)
+  }
+
+  updateVariables() {
+    UpdateVariables(this)
   }
 }
 

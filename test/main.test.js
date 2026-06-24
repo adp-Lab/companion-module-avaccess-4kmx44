@@ -25,7 +25,7 @@ test('maybeLearnScene captures routing into the pending slot only on a routing c
   assert.equal(inst.pendingSceneLearn, null)
 })
 
-test('startPolling sends one poll command per tick, round-robin; stopPolling halts it', (t) => {
+test('startPolling sends the one-shot static queries once, then round-robins the poll commands forever', (t) => {
   t.mock.timers.enable({ apis: ['setInterval'] })
   const sent = []
   const inst = Object.create(ModuleInstance.prototype)
@@ -33,11 +33,14 @@ test('startPolling sends one poll command per tick, round-robin; stopPolling hal
 
   inst.startPolling()
   // Primes only the FIRST command synchronously — the matrix drops back-to-back queries.
-  assert.deepEqual(sent, ['GET MP all\r\n'])
+  assert.deepEqual(sent, ['GET VER\r\n'])
 
-  // Advance enough ticks for two full cycles of the 5 poll commands.
-  t.mock.timers.tick(10 * 300)
-  assert.deepEqual(sent.slice(0, 10), [
+  // Advance through the 3 static one-shots + two full cycles of the 5 poll commands.
+  t.mock.timers.tick(12 * 300)
+  assert.deepEqual(sent, [
+    'GET VER\r\n',
+    'GET IPADDR\r\n',
+    'GET IP Mode\r\n',
     'GET MP all\r\n',
     'GET MUTE all\r\n',
     'GET HDCP_S all\r\n',
