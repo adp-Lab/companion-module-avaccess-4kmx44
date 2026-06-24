@@ -55,7 +55,7 @@ class LineBuffer {
   }
 }
 
-const KNOWN_REPLY_KEYWORDS = ['SW', 'MP', 'MUTE', 'HDCP_S', 'SCALER', 'CEC_PWR', 'PRESET', 'EDID', 'REBOOT', 'RESET']
+const KNOWN_REPLY_KEYWORDS = ['SW', 'MP', 'MUTE', 'HDCP_S', 'SCALER', 'CEC_PWR', 'PRESET', 'EDID', 'IPADDR', 'IP', 'REBOOT', 'RESET']
 
 function parseDeviceReply(line) {
   const trimmed = line.trim()
@@ -73,6 +73,12 @@ function parseDeviceReply(line) {
   }
 }
 
+function parseVersionReply(line) {
+  const match = line.trim().match(/^(\S+) VER ([\d.]+), ARM VER ([\d.]+)$/)
+  if (!match) return null
+  return { model: match[1], firmware: `VER ${match[2]} · ARM ${match[3]}` }
+}
+
 function createInitialState() {
   return {
     routing: { 1: null, 2: null, 3: null, 4: null },
@@ -80,6 +86,8 @@ function createInitialState() {
     hdcp: { 1: null, 2: null, 3: null, 4: null },
     scaler: { 1: null, 2: null, 3: null, 4: null },
     cecPower: { 1: null, 2: null, 3: null, 4: null },
+    edid: { 1: null, 2: null, 3: null, 4: null },
+    deviceInfo: { model: null, firmware: null, ipAddress: null, ipMode: null },
     // Learned routing snapshot per hardware scene slot (the device has no preset-query
     // API, so we learn each slot's contents when it is saved/recalled via Companion).
     scenes: { 1: null, 2: null, 3: null },
@@ -101,7 +109,14 @@ function routingEquals(a, b) {
 // lines (`MP hdmiin1 hdmiout1`). Per-output `GET MP hdmioutN` instead returns the short
 // `MP inN hdmioutN` form — handled by applyReplyToState, but not used for polling.
 function buildPollCommands() {
-  return ['GET MP all\r\n', 'GET MUTE all\r\n', 'GET HDCP_S all\r\n', 'GET SCALER all\r\n']
+  return ['GET MP all\r\n', 'GET MUTE all\r\n', 'GET HDCP_S all\r\n', 'GET SCALER all\r\n', 'GET EDID all\r\n']
+}
+
+// One-shot device-info queries, sent once on connect (never repeated) — confirmed live
+// reply shapes: GET VER → "4KMX44-H2 VER 3.1, ARM VER 2.6", GET IPADDR →
+// "IPADDR IP:x MASK:x GATE:x", GET IP Mode → "IP MODE DHCP".
+function buildStaticInfoCommands() {
+  return ['GET VER\r\n', 'GET IPADDR\r\n', 'GET IP Mode\r\n']
 }
 
 function applyBoolState(stateMap, target, value, prefix) {
@@ -119,6 +134,19 @@ function applyBoolState(stateMap, target, value, prefix) {
     }
   }
 }
+
+function applyNumericState(stateMap, target, value, prefix) {
+  if (!target) return
+  const num = parseInt(target.replace(prefix, ''), 10)
+  // Ignore out-of-range targets so a stray reply can't add a phantom key.
+  if (Object.prototype.hasOwnProperty.call(stateMap, num)) {
+    stateMap[num] = parseInt(value, 10)
+  }
+}
+
+// STATIC is inferred, not confirmed on hardware — only DHCP has been observed live
+// (the test matrix's network mode could not be safely switched to verify it).
+const IP_MODE_LABELS = { DHCP: 'DHCP', STATIC: 'Static' }
 
 function applyReplyToState(state, reply) {
   if (!reply) return
@@ -151,6 +179,13 @@ function applyReplyToState(state, reply) {
     applyBoolState(state.scaler, target, value, 'hdmiout')
   } else if (keyword === 'CEC_PWR') {
     applyBoolState(state.cecPower, target, value, 'hdmiout')
+  } else if (keyword === 'EDID') {
+    applyNumericState(state.edid, target, value, 'hdmiin')
+  } else if (keyword === 'IPADDR') {
+    const match = target && target.match(/^IP:(.+)$/)
+    if (match) state.deviceInfo.ipAddress = match[1]
+  } else if (keyword === 'IP' && target === 'MODE') {
+    state.deviceInfo.ipMode = IP_MODE_LABELS[value] ?? value
   }
 }
 
@@ -165,8 +200,10 @@ module.exports = {
   buildCecPowerCommand,
   buildEdidCommand,
   buildPollCommands,
+  buildStaticInfoCommands,
   LineBuffer,
   parseDeviceReply,
+  parseVersionReply,
   createInitialState,
   applyReplyToState,
   routingEquals,

@@ -12,9 +12,11 @@ const {
   buildEdidCommand,
   LineBuffer,
   parseDeviceReply,
+  parseVersionReply,
   createInitialState,
   applyReplyToState,
   buildPollCommands,
+  buildStaticInfoCommands,
   routingEquals,
 } = require('../src/commands')
 
@@ -109,6 +111,68 @@ test('createInitialState includes empty scene snapshots', () => {
   assert.deepEqual(createInitialState().scenes, { 1: null, 2: null, 3: null })
 })
 
+test('createInitialState includes empty EDID and device-info slots', () => {
+  const state = createInitialState()
+  assert.deepEqual(state.edid, { 1: null, 2: null, 3: null, 4: null })
+  assert.deepEqual(state.deviceInfo, { model: null, firmware: null, ipAddress: null, ipMode: null })
+})
+
+test('parseDeviceReply parses IPADDR and IP Mode replies', () => {
+  assert.deepEqual(parseDeviceReply('IPADDR IP:192.0.2.10 MASK:255.255.255.0 GATE:192.0.2.1'), {
+    keyword: 'IPADDR',
+    target: 'IP:192.0.2.10',
+    value: 'MASK:255.255.255.0',
+  })
+  assert.deepEqual(parseDeviceReply('IP MODE DHCP'), { keyword: 'IP', target: 'MODE', value: 'DHCP' })
+})
+
+test('applyReplyToState records EDID preset per input', () => {
+  const state = createInitialState()
+  applyReplyToState(state, parseDeviceReply('EDID hdmiin1 6'))
+  applyReplyToState(state, parseDeviceReply('EDID hdmiin2 05'))
+  assert.equal(state.edid[1], 6)
+  assert.equal(state.edid[2], 5)
+})
+
+test('applyReplyToState ignores EDID replies for out-of-range inputs', () => {
+  const state = createInitialState()
+  applyReplyToState(state, parseDeviceReply('EDID hdmiin9 6'))
+  assert.deepEqual(state.edid, { 1: null, 2: null, 3: null, 4: null })
+})
+
+test('applyReplyToState extracts the IP address from an IPADDR reply', () => {
+  const state = createInitialState()
+  applyReplyToState(state, parseDeviceReply('IPADDR IP:192.0.2.10 MASK:255.255.255.0 GATE:192.0.2.1'))
+  assert.equal(state.deviceInfo.ipAddress, '192.0.2.10')
+})
+
+test('applyReplyToState maps IP Mode DHCP/STATIC to display labels', () => {
+  const dhcp = createInitialState()
+  applyReplyToState(dhcp, parseDeviceReply('IP MODE DHCP'))
+  assert.equal(dhcp.deviceInfo.ipMode, 'DHCP')
+
+  // STATIC reply text is unconfirmed on hardware — this only checks our mapping table.
+  const staticState = createInitialState()
+  applyReplyToState(staticState, parseDeviceReply('IP MODE STATIC'))
+  assert.equal(staticState.deviceInfo.ipMode, 'Static')
+})
+
+test('parseVersionReply extracts model and a formatted firmware string', () => {
+  assert.deepEqual(parseVersionReply('4KMX44-H2 VER 3.1, ARM VER 2.6'), {
+    model: '4KMX44-H2',
+    firmware: 'VER 3.1 · ARM 2.6',
+  })
+})
+
+test('parseVersionReply returns null for an unrecognized line', () => {
+  assert.equal(parseVersionReply('GARBAGE'), null)
+  assert.equal(parseVersionReply(''), null)
+})
+
+test('buildStaticInfoCommands returns the one-shot device-info queries with CRLF terminators', () => {
+  assert.deepEqual(buildStaticInfoCommands(), ['GET VER\r\n', 'GET IPADDR\r\n', 'GET IP Mode\r\n'])
+})
+
 test('routingEquals compares all four outputs and rejects null snapshots', () => {
   assert.equal(routingEquals({ 1: 1, 2: 2, 3: 3, 4: 4 }, { 1: 1, 2: 2, 3: 3, 4: 4 }), true)
   assert.equal(routingEquals({ 1: 1, 2: 2, 3: 3, 4: 4 }, { 1: 1, 2: 2, 3: 3, 4: 1 }), false)
@@ -159,6 +223,7 @@ test('buildPollCommands returns the read-only status queries with CRLF terminato
     'GET MUTE all\r\n',
     'GET HDCP_S all\r\n',
     'GET SCALER all\r\n',
+    'GET EDID all\r\n',
   ])
 })
 

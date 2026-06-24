@@ -35,17 +35,19 @@ test('startPolling sends one poll command per tick, round-robin; stopPolling hal
   // Primes only the FIRST command synchronously — the matrix drops back-to-back queries.
   assert.deepEqual(sent, ['GET MP all\r\n'])
 
-  // Advance enough ticks for two full cycles of the 4 poll commands.
-  t.mock.timers.tick(8 * 300)
-  assert.deepEqual(sent.slice(0, 8), [
+  // Advance enough ticks for two full cycles of the 5 poll commands.
+  t.mock.timers.tick(10 * 300)
+  assert.deepEqual(sent.slice(0, 10), [
     'GET MP all\r\n',
     'GET MUTE all\r\n',
     'GET HDCP_S all\r\n',
     'GET SCALER all\r\n',
+    'GET EDID all\r\n',
     'GET MP all\r\n',
     'GET MUTE all\r\n',
     'GET HDCP_S all\r\n',
     'GET SCALER all\r\n',
+    'GET EDID all\r\n',
   ])
 
   inst.stopPolling()
