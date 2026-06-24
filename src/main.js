@@ -17,8 +17,10 @@ const { buildVariableValues } = require('./variables')
 
 // The matrix doesn't push unsolicited updates, so we poll. It also drops GET queries
 // that arrive back-to-back (confirmed on hardware: a tight burst of 4 only answered the
-// first 2), so we send ONE command per tick, round-robin. With 4 poll commands a full
-// state refresh takes ~4 ticks (~1.2 s) — fast enough for routing feedback.
+// first 2), so we send ONE command per tick. On connect, 3 one-shot static queries
+// (GET VER, GET IPADDR, GET IP Mode) are sent first; then 5 poll commands round-robin
+// forever. Initial full cycle (one-shots + poll): ~8 ticks (~2.4 s). Subsequent cycles:
+// ~5 ticks (~1.5 s) — fast enough for routing feedback.
 const POLL_STAGGER_MS = 300
 
 class ModuleInstance extends InstanceBase {
