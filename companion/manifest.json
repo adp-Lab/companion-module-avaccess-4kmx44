@@ -4,7 +4,7 @@
   "name": "AV Access 4KMX44-H2",
   "shortname": "4kmx44-h2",
   "description": "4x4 HDMI matrix with audio breakout, controlled over Telnet",
-  "version": "0.0.0",
+  "version": "1.1.0",
   "license": "MIT",
   "repository": "git+https://github.com/adp-Lab/companion-module-avaccess-4kmx44.git",
   "bugs": "https://github.com/adp-Lab/companion-module-avaccess-4kmx44/issues",

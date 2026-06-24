@@ -1,6 +1,6 @@
 {
   "name": "avaccess-4kmx44",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "main": "src/main.js",
   "scripts": {
     "test": "node --test"
@@ -15,5 +15,8 @@
   },
   "dependencies": {
     "@companion-module/base": "~2.0.4"
+  },
+  "devDependencies": {
+    "@companion-module/tools": "^3.0.2"
   }
 }
